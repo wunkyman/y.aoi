@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>y.aoi</title>
+<meta name="theme-color" content="#F5F3EC">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="y.aoi">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&family=Courier+Prime:wght@700&family=Pixelify+Sans:wght@500&display=swap">
+<style>
+/* Layout: the whole app is one paper receipt on a desk. Header block, dashed rules, then the active section.
+   Tools live in a 1-bit vintage toolbox rail. Single light look by choice: off-white paper, off-black ink. */
+:root{
+  --desk:#DCD9D0; --paper:#F5F3EC; --ink:#1F1E1B; --grey:#8F8B81; --faint:#C9C5BB;
+  --font-dot:'DotGothic16','Osaka','MS Gothic',ui-monospace,monospace;
+  --font-slip:'Courier Prime','Courier New',Courier,monospace;
+  --font-pixel:'Pixelify Sans','DotGothic16',ui-monospace,monospace;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{margin:0;background:var(--desk);color:var(--ink);font-family:var(--font-dot);font-size:16px;line-height:1.35;-webkit-font-smoothing:none}
+button,select,textarea,input{font:inherit;color:inherit}
+:focus-visible{outline:2px dashed var(--ink);outline-offset:2px}
+.px{display:block;shape-rendering:crispEdges}
+
+.desk{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-top:calc(28px + env(safe-area-inset-top,0px));padding-bottom:calc(48px + env(safe-area-inset-bottom,0px))}
+.receipt{position:relative;max-width:440px;margin:0 auto;background:var(--paper);padding:26px 20px 30px}
+/* dithered drop shadow */
+.receipt::before{content:"";position:absolute;inset:8px -8px -8px 8px;z-index:-1;background-image:conic-gradient(var(--ink) 25%,transparent 0 50%,var(--ink) 0 75%,transparent 0);background-size:4px 4px;opacity:.35}
+/* torn edges */
+.edge{position:absolute;left:0;right:0;height:10px;background:linear-gradient(135deg,var(--paper) 50%,transparent 0) 0 0/12px 10px repeat-x,linear-gradient(-135deg,var(--paper) 50%,transparent 0) 0 0/12px 10px repeat-x}
+.edge.top{top:-10px;transform:scaleY(-1)}
+.edge.bottom{bottom:-10px}
+
+.rule{border:0;border-top:2px dashed var(--ink);margin:14px 0;opacity:.85}
+.rule.dots{border-top-style:dotted;opacity:.6}
+
+/* header */
+.head{display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.ascii{font-family:var(--font-dot);white-space:pre;line-height:1.05;font-size:15px;margin:0}
+.head{container-type:inline-size}
+.logo-art{display:block;width:60%;max-width:220px;height:auto;margin:4px auto 2px;image-rendering:pixelated}
+.logo{font-size:30px;line-height:1;letter-spacing:.12em}
+.ticket{font-size:20px;letter-spacing:.12em;font-variant-numeric:tabular-nums}
+.stamp{display:flex;justify-content:space-between;width:100%;font-size:15px;font-variant-numeric:tabular-nums}
+
+/* nav as toolbox tabs */
+nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:2px solid var(--ink)}
+nav a{position:relative;min-height:48px;display:grid;place-items:center;color:var(--ink);background:var(--paper);text-decoration:none}
+nav a+a{border-left:2px solid var(--ink)}
+nav a[aria-current="page"]{background:var(--ink);color:var(--paper)}
+.badge{position:absolute;top:4px;right:6px;font-size:13px;font-variant-numeric:tabular-nums}
+.badge[data-n="0"]{display:none}
+
+/* capture: toolbox + slip */
+.studio{display:flex;gap:12px;align-items:flex-start}
+.toolbox{flex:none;border:2px solid var(--ink);background:var(--paper);width:52px}
+.titlebar{height:14px;border-bottom:2px solid var(--ink);background:repeating-linear-gradient(var(--ink) 0 1px,transparent 1px 3px);background-clip:content-box;padding:3px 3px;position:relative}
+.titlebar::after{content:"";position:absolute;left:6px;top:2px;width:8px;height:8px;background:var(--paper);border:1px solid var(--ink);box-shadow:0 0 0 2px var(--paper)}
+.tools{display:flex;flex-direction:column}
+.tool{height:48px;display:grid;place-items:center;border:0;border-bottom:1px solid var(--ink);background:var(--paper);color:var(--ink);cursor:pointer;padding:0}
+.tool:last-child{border-bottom:0}
+.tool[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.tool:active:not(:disabled){background:var(--ink);color:var(--paper)}
+.tool:disabled{color:var(--faint);cursor:not-allowed}
+.tool.sep{border-top:2px solid var(--ink)}
+.tool.save:not(:disabled){background-image:conic-gradient(var(--faint) 25%,transparent 0 50%,var(--faint) 0 75%,transparent 0);background-size:2px 2px}
+.tool.save:not(:disabled):active{background:var(--ink)}
+
+.slip-edit{position:relative;flex:1;min-width:0;aspect-ratio:1;background:#FBFAF6;outline:2px dashed var(--ink);outline-offset:4px;margin:6px 6px 6px 0;overflow:hidden;container-type:inline-size}
+.slip-edit canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;image-rendering:pixelated}
+.slip-edit textarea{position:absolute;inset:0;width:100%;height:100%;border:0;background:transparent;resize:none;padding:17.8cqw 9cqw 9cqw;font-family:var(--font-pixel);font-weight:500;font-size:8.2cqw;line-height:1.2;color:var(--ink);outline:none;overflow:hidden;caret-color:var(--ink)}
+.slip-edit[data-tool="text"] canvas{pointer-events:none}
+.slip-edit:not([data-tool="text"]) textarea{pointer-events:none}
+.slip-edit[data-tool="pen"] canvas{cursor:crosshair}
+.slip-edit[data-tool="eraser"] canvas{cursor:cell}
+.todo-tog{position:absolute;top:2px;right:2px;width:44px;height:44px;display:grid;place-items:center;border:0;padding:0;background:transparent;color:var(--ink);cursor:pointer;z-index:2}
+.slip-edit .meta{right:52px}
+.slip-edit.todo{background:var(--ink)}
+.slip-edit.todo textarea{color:var(--paper);caret-color:var(--paper)}
+.slip-edit.todo canvas{filter:invert(1)}
+.slip-edit.todo .meta{color:#A9A59B}
+.slip-edit.todo .todo-tog{color:var(--paper)}
+.slip.todo{background:var(--ink);color:var(--paper)}
+.slip.todo img{filter:invert(1)}
+.slip.todo .meta{color:#A9A59B}
+.meta{position:absolute;left:9cqw;right:9cqw;top:6cqw;display:flex;justify-content:space-between;font-family:var(--font-dot);font-size:3.6cqw;color:var(--grey);pointer-events:none;font-variant-numeric:tabular-nums}
+
+/* slips (display) */
+.grid{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:18px 14px}
+.cell{display:flex;flex-direction:column;gap:6px}
+.slip{position:relative;aspect-ratio:1;background:#FBFAF6;outline:1.5px dashed var(--ink);outline-offset:3px;margin:3px;overflow:hidden;container-type:inline-size}
+.slip img{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated}
+.slip .meta{font-size:6.5cqw}
+.slip .t{position:absolute;left:9cqw;right:9cqw;top:17.8cqw;bottom:9cqw;font-family:var(--font-pixel);font-weight:500;font-size:var(--fs,8.2cqw);line-height:1.2;overflow:hidden;overflow-wrap:anywhere;white-space:pre-wrap}
+.acts{display:flex;justify-content:flex-end;gap:0}
+.pbtn{width:44px;height:40px;display:grid;place-items:center;border:2px solid var(--ink);background:var(--paper);color:var(--ink);cursor:pointer;padding:0}
+.pbtn+.pbtn{border-left:0}
+.pbtn.armed,.pbtn:active:not(:disabled){background:var(--ink);color:var(--paper)}
+.pbtn:disabled{color:var(--faint);border-color:var(--faint);cursor:not-allowed}
+.pbtn.big{width:64px;height:56px}
+.empty{grid-column:1/-1;min-height:120px;display:grid;place-items:center;color:var(--grey)}
+.toggle{display:flex;align-items:center;gap:10px;width:100%;min-height:44px;border:0;background:transparent;padding:0;cursor:pointer}
+.toggle .leader{flex:1;border-top:2px dotted var(--grey)}
+.toggle .n{font-variant-numeric:tabular-nums}
+
+/* print: receipt line items */
+.line{display:flex;align-items:center;gap:10px;min-height:44px;font-size:20px;font-variant-numeric:tabular-nums}
+.line .leader{flex:1;border-top:2px dotted var(--grey);align-self:center}
+.line.total{font-size:34px}
+.line select{appearance:none;-webkit-appearance:none;min-height:40px;padding:0 12px;border:2px solid var(--ink);background:var(--paper);border-radius:0;font-size:18px;cursor:pointer}
+.actions{display:flex;justify-content:center;gap:0;margin-top:6px}
+.strip{width:min(100%,250px);margin:0 auto;display:flex;flex-direction:column;gap:14px;padding-block:6px}
+.strip .slip{outline-width:1.5px}
+
+/* footer */
+.foot{display:flex;flex-direction:column;align-items:center;gap:10px}
+.barcode{display:block;width:100%;max-width:260px;height:46px}
+.reg{display:flex;justify-content:space-between;width:100%;font-size:14px;font-variant-numeric:tabular-nums}
+
+.offline{display:flex;justify-content:center;color:var(--ink);margin-top:8px}
+[hidden]{display:none!important}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 14px;display:flex;gap:10px;align-items:center;z-index:20;font-variant-numeric:tabular-nums}
+.login{display:flex;flex-direction:column;gap:10px;align-items:stretch}
+.login input{min-height:48px;padding:0 12px;border:2px solid var(--ink);background:#FBFAF6;border-radius:0;font-size:18px}
+.login .actions{margin-top:4px}
+.setup{white-space:pre-wrap;font-size:14px;margin:0}
+.foot .row{display:flex;justify-content:center;gap:0}
+.pbtn[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+@media (max-width:380px){ .receipt{padding-inline:14px} }
+</style>
+</head>
+<body>
+<div class="desk">
+<div class="receipt" id="receipt">
+  <span class="edge top" aria-hidden="true"></span>
+
+  <div class="head">
+<pre id="mark-src" hidden>                                                    ####################
+                                              #######                  ########
+                                          #####                              ######
+                                       #####                                      ###
+                                    ####                                            ####
+                                  ###                                                  ###
+                                ###                                                      ###
+                               ###                                                        ###
+                              ##                                                            ##
+                  #############                                                              #############
+             ########                                                                                  #######
+           ####                                                                                             #####
+        ####                                                                                                    ####
+      ####                                                                                                         ###
+     ###                                                                                                             ###
+   ###                                                                                                                ###
+  ###                                                                                                                  ###
+  ##                                                                                                                    ###
+ ##                                                                                                                      ##
+ ##                                                                                                                       ##
+##                                                                                                                        ##
+##                             ############                                       ###########                             ##
+##                            #             ########                    ########             #                            ##
+##                            #       ##### ####     ######       #####     #### #####       #                            ##
+ ##                           ##       ##############     ##    ##     ##############       ##                           ##
+ ##                            ##        #############     ##   #      ############         #                           ###
+  ##                            ##     ##########          ##   #          ##########     ###                           ##
+   ###                           ###           ####      ###     ##      #####          ###                            ###
+    ###                            ####              ####          #####             ####                            ###
+      ###                              ###############                 ##############                              ####
+        ###                                                                                                      ###
+          ####                         #                                            ##                        ####
+            ######                 ########                                      #########                #####
+                #####################     #####                              ######     ####################
+                                              ######                    #######
+                                                  ########################</pre>
+    <canvas class="logo-art" id="logo-art" role="img" aria-label="y.aoi"></canvas>
+    <div class="logo">y.aoi</div>
+    <div class="ticket" id="ticket" aria-label="Next idea number">No.0001</div>
+    <div class="stamp"><span id="stamp-date"></span><span id="stamp-time"></span></div>
+  </div>
+  <span class="offline" id="offline" hidden title="Not saving"><i data-px="alert"></i></span>
+
+  <hr class="rule">
+
+  <section id="view-setup" hidden>
+    <pre class="setup">( ; _ ; )
+config.js ...... missing
+see setup guide, step 3</pre>
+  </section>
+
+  <section id="view-login" hidden>
+    <form class="login" id="login-form">
+      <input id="login-email" type="email" autocomplete="username" placeholder="email" aria-label="Email" required>
+      <input id="login-pass" type="password" autocomplete="current-password" placeholder="password" aria-label="Password" required>
+      <div class="actions"><button type="submit" class="pbtn big" id="login-go" aria-label="Sign in" title="Sign in"><i data-px="key" data-s="3"></i></button></div>
+    </form>
+  </section>
+
+  <div id="app" hidden>
+  <nav aria-label="Sections">
+    <a href="#capture" data-view="capture" aria-label="Capture" title="Capture"><i data-px="pen" data-s="3"></i></a>
+    <a href="#inbox" data-view="inbox" aria-label="Inbox" title="Inbox"><i data-px="tray" data-s="3"></i><span class="badge" id="badge" data-n="0">0</span></a>
+    <a href="#print" data-view="print" aria-label="Print" title="Print"><i data-px="printer" data-s="3"></i></a>
+  </nav>
+
+  <hr class="rule">
+
+  <!-- CAPTURE -->
+  <section id="view-capture" aria-label="Capture">
+    <div class="studio">
+      <div class="toolbox">
+        <div class="titlebar" aria-hidden="true"></div>
+        <div class="tools" role="toolbar" aria-label="Tools" aria-orientation="vertical">
+          <button type="button" class="tool" id="t-text" aria-pressed="true" aria-label="Text" title="Text"><i data-px="text" data-s="2"></i></button>
+          <button type="button" class="tool" id="t-pen" aria-pressed="false" aria-label="Pen" title="Pen"><i data-px="pen" data-s="2"></i></button>
+          <button type="button" class="tool" id="t-eraser" aria-pressed="false" aria-label="Eraser" title="Eraser"><i data-px="eraser" data-s="2"></i></button>
+          <button type="button" class="tool sep" id="t-undo" aria-label="Undo" title="Undo" disabled><i data-px="undo" data-s="2"></i></button>
+          <button type="button" class="tool" id="t-clear" aria-label="Clear" title="Clear"><i data-px="trash" data-s="2"></i></button>
+          <button type="button" class="tool sep save" id="t-save" aria-label="Save idea" title="Save idea" disabled><i data-px="check" data-s="2"></i></button>
+        </div>
+      </div>
+      <div class="slip-edit" id="editor" data-tool="text">
+        <canvas id="ink" width="768" height="768" aria-label="Drawing layer"></canvas>
+        <textarea id="ink-text" aria-label="Idea text" autocomplete="off" spellcheck="true"></textarea>
+        <div class="meta" aria-hidden="true"><span id="ed-num">#0001</span><span id="ed-date"></span></div>
+        <button type="button" class="todo-tog" id="t-todo" aria-pressed="false" aria-label="To do" title="To do"></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- INBOX -->
+  <section id="view-inbox" aria-label="Inbox" hidden>
+    <ul class="grid" id="inbox-list"></ul>
+    <hr class="rule dots">
+    <button type="button" class="toggle" id="toggle-printed" aria-expanded="false" aria-label="Printed ideas" title="Printed ideas">
+      <i data-px="printer" data-s="2"></i><span class="leader"></span><span class="n" id="printed-count">0</span>
+    </button>
+    <ul class="grid" id="printed-list" hidden style="margin-top:12px"></ul>
+  </section>
+
+  <!-- PRINT -->
+  <section id="view-print" aria-label="Print" hidden>
+    <div class="line"><i data-px="tray" data-s="2"></i><span class="leader"></span><span id="ready-count" aria-label="Ideas ready">0</span></div>
+    <div class="line"><label for="print-day" title="Print day"><i data-px="calendar" data-s="2"></i></label><span class="leader"></span>
+      <select id="print-day" aria-label="Print day"><option value="0">SUN</option><option value="1">MON</option><option value="2">TUE</option><option value="3">WED</option><option value="4">THU</option><option value="5">FRI</option><option value="6">SAT</option></select>
+      <span id="days-left" style="min-width:2.4em;text-align:right"></span>
+    </div>
+    <hr class="rule">
+    <div class="line total"><span aria-hidden="true">&#8721;</span><span class="leader"></span><span id="total-count">0</span></div>
+    <div class="actions">
+      <button type="button" class="pbtn big" id="usb" aria-pressed="false" aria-label="Connect printer" title="Connect printer" hidden><i data-px="plug" data-s="3"></i></button>
+      <button type="button" class="pbtn big" id="print-now" aria-label="Print now" title="Print now" hidden><i data-px="printer" data-s="3"></i></button>
+      <button type="button" class="pbtn big" id="download" aria-label="Download receipt PDF" title="Download receipt PDF"><i data-px="download" data-s="3"></i></button>
+      <button type="button" class="pbtn big" id="mark" aria-label="Mark as printed" title="Mark as printed" hidden><i data-px="check" data-s="3"></i></button>
+    </div>
+    <hr class="rule">
+    <div class="strip" id="strip"></div>
+  </section>
+  </div>
+
+  <hr class="rule">
+  <div class="foot">
+<pre class="ascii" aria-hidden="true">  _   _   _
+ (o) (o) (o)
+  \   |   /
+   '--+--'</pre>
+    <svg class="barcode px" id="barcode" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"></svg>
+    <div class="reg"><span id="reg-left">IDEAS 0000</span><span id="reg-right">PRINTED 0000</span></div>
+    <div class="row"><button type="button" class="pbtn" id="logout" aria-label="Sign out" title="Sign out" hidden><i data-px="exit" data-s="2"></i></button></div>
+  </div>
+
+  <span class="edge bottom" aria-hidden="true"></span>
+</div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+(function(){
+  const $ = (s) => document.querySelector(s);
+
+  // ---------- 1-bit pixel icons (12x12) ----------
+  const PX = {
+    text:    ['############','############','##...##...##','.....##.....','.....##.....','.....##.....','.....##.....','.....##.....','.....##.....','.....##.....','....####....','....####....'],
+    pen:     ['.........##.','........####','.......#.###','......#...#.','.....#...#..','....#...#...','...#...#....','..#...#.....','.#.#.#......','.##.#.......','.###........','............'],
+    eraser:  ['............','.......####.','......#..##.','.....#..#.#.','....#..#..#.','...#..#..#..','..######.#..','..#....##...','..#....#....','..######....','............','############'],
+    undo:    ['............','...#........','..##........','.#########..','..##.....##.','...#......#.','..........#.','..........#.','.........##.','...######...','............','............'],
+    trash:   ['....####....','############','............','.##########.','.#.#.##.#.#.','.#.#.##.#.#.','.#.#.##.#.#.','.#.#.##.#.#.','.#.#.##.#.#.','.#.#.##.#.#.','.##########.','............'],
+    check:   ['............','..........##','.........###','........###.','.......###..','##....###...','###..###....','.#####......','..###.......','...#........','............','............'],
+    tray:    ['............','.##########.','.#........#.','.#........#.','#..........#','#..........#','####....####','#..#....#..#','#...####...#','#..........#','############','............'],
+    printer: ['..########..','..#......#..','..#......#..','############','#..........#','#........#.#','#..........#','###......###','..#......#..','..#.####.#..','..#......#..','..########..'],
+    download:['.....##.....','.....##.....','.....##.....','.....##.....','..##.##.##..','...######...','....####....','.....##.....','............','#..........#','#..........#','############'],
+    calendar:['..#......#..','############','############','#..........#','#.##.##.##.#','#..........#','#.##.##.##.#','#..........#','#.##.##....#','#..........#','############','............'],
+    alert:   ['############','#..........#','#....##....#','#....##....#','#....##....#','#....##....#','#....##....#','#..........#','#....##....#','#....##....#','#..........#','############'],
+    back:    ['............','....#.......','...##.......','..#######...','.########...','..#######..#','...##.....##','....#....##.','........##..','......###...','............','............'],
+    box:     ['############','#..........#','#..........#','#..........#','#..........#','#..........#','#..........#','#..........#','#..........#','#..........#','#..........#','############'],
+    boxcheck:['############','#..........#','#.........##','#........#.#','#.......##.#','#.##...##..#','#..##.##...#','#...###....#','#....#.....#','#..........#','#..........#','############'],
+    key:     ['............','............','.####.......','#....#......','#.##.#######','#.##.#######','#....#..#.#.','.####...#.#.','............','............','............','............'],
+    plug:    ['...#....#...','...#....#...','...#....#...','.##########.','.#........#.','.#........#.','..#......#..','...######...','.....##.....','.....##.....','.....##.....','.....##.....'],
+    exit:    ['#######.....','#.....#.....','#.....#..#..','#.....#..##.','#....#######','#....#######','#.....#..##.','#.....#..#..','#.....#.....','#######.....','............','............']
+  };
+  function pxSvg(name, scale){
+    const rows = PX[name] || PX.alert, s = scale || 2;
+    let d = '';
+    rows.forEach((r, y) => { for (let x = 0; x < r.length; x++) if (r[x] === '#') d += 'M' + x + ' ' + y + 'h1v1h-1z'; });
+    return '<svg class="px" width="' + 12 * s + '" height="' + 12 * s + '" viewBox="0 0 12 12" aria-hidden="true"><path fill="currentColor" d="' + d + '"/></svg>';
+  }
+  document.querySelectorAll('i[data-px]').forEach(i => { i.outerHTML = pxSvg(i.dataset.px, parseInt(i.dataset.s || '2', 10)); });
+
+  const VIEWS = ['capture', 'inbox', 'print'];
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const DOW = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+
+  let sb = null, ideas = [], settings = { printDay: 0 }, pendingMark = null;
+
+  const shortDate = (iso) => { const d = new Date(iso); return isNaN(d) ? '' : d.getDate() + ' ' + MONTHS[d.getMonth()]; };
+  const pad4 = (n) => String(n || 0).padStart(4, '0');
+  const numLabel = (n) => '#' + pad4(n);
+  const inbox = () => ideas.filter(i => !i.printedAt);
+  const printed = () => ideas.filter(i => i.printedAt);
+  const nextNum = () => ideas.reduce((m, i) => Math.max(m, i.num || 0), 0) + 1;
+
+  let toastTimer = null;
+  function toast(ok, label){
+    const t = $('#toast'); t.innerHTML = pxSvg(ok ? 'check' : 'alert', 2) + '<span>' + (ok ? '( ^ w ^ )' : '( ; _ ; )') + '</span>';
+    t.setAttribute('aria-label', label || (ok ? 'Done' : 'Failed')); t.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 1600);
+  }
+
+  // ---------- header stamp + barcode ----------
+  function stamp(){
+    const d = new Date();
+    $('#stamp-date').textContent = d.getFullYear() + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + String(d.getDate()).padStart(2, '0') + ' (' + DOW[d.getDay()] + ')';
+    $('#stamp-time').textContent = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    $('#ed-date').textContent = shortDate(d.toISOString());
+  }
+  function barcode(seed){
+    let x = 2, d = '', r = (seed * 9301 + 49297) % 233280 || 7;
+    while (x < 118){ r = (r * 9301 + 49297) % 233280; const w = 1 + (r % 3); d += 'M' + x + ' 0h' + w + 'v30h-' + w + 'z'; r = (r * 9301 + 49297) % 233280; x += w + 1 + (r % 2); }
+    $('#barcode').innerHTML = '<path fill="currentColor" d="' + d + '"/>';
+  }
+
+  // ---------- routing ----------
+  function route(){
+    const h = location.hash.slice(1); const v = VIEWS.includes(h) ? h : 'capture';
+    VIEWS.forEach(n => { $('#view-' + n).hidden = n !== v; });
+    document.querySelectorAll('nav a').forEach(a => a.dataset.view === v ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current'));
+    if (v === 'capture' && tool === 'text') setTimeout(() => $('#ink-text').focus({ preventScroll: true }), 0);
+  }
+  window.addEventListener('hashchange', route);
+
+  // ---------- slip display ----------
+  function slipEl(i){
+    const d = document.createElement('div'); d.className = 'slip' + (i.todo ? ' todo' : '');
+    if (i.sketch){ const img = document.createElement('img'); img.src = i.sketch; img.alt = ''; d.appendChild(img); }
+    const m = document.createElement('div'); m.className = 'meta';
+    const a = document.createElement('span'); a.textContent = numLabel(i.num);
+    const b = document.createElement('span'); b.textContent = shortDate(i.createdAt);
+    m.append(a, b); d.appendChild(m);
+    if (i.text){
+      const t = document.createElement('div'); t.className = 't'; t.textContent = i.text;
+      const len = i.text.length; if (len > 50) t.style.setProperty('--fs', Math.max(4, 8.2 * Math.sqrt(50 / len)) + 'cqw');
+      d.appendChild(t);
+    }
+    d.setAttribute('role', 'img'); d.setAttribute('aria-label', (i.text || 'Sketch') + ', ' + numLabel(i.num));
+    return d;
+  }
+  function cellEl(i){
+    const li = document.createElement('li'); li.className = 'cell';
+    li.appendChild(slipEl(i));
+    const acts = document.createElement('div'); acts.className = 'acts';
+    if (i.printedAt){
+      const back = document.createElement('button'); back.type = 'button'; back.className = 'pbtn'; back.innerHTML = pxSvg('back', 2);
+      back.setAttribute('aria-label', 'Back to inbox'); back.title = 'Back to inbox';
+      back.addEventListener('click', () => updateIdea(i.id, { printedAt: null }));
+      acts.appendChild(back);
+    }
+    const del = document.createElement('button'); del.type = 'button'; del.className = 'pbtn'; del.innerHTML = pxSvg('trash', 2);
+    del.setAttribute('aria-label', 'Delete'); del.title = 'Delete';
+    let timer = null;
+    del.addEventListener('click', () => {
+      if (!del.classList.contains('armed')){ del.classList.add('armed'); del.setAttribute('aria-label', 'Confirm delete'); timer = setTimeout(() => { del.classList.remove('armed'); del.setAttribute('aria-label', 'Delete'); }, 2500); return; }
+      clearTimeout(timer); deleteIdea(i.id);
+    });
+    acts.appendChild(del); li.appendChild(acts);
+    return li;
+  }
+  const EMPTY = '( . _ . )';
+  function fill(ul, list){
+    ul.replaceChildren();
+    if (!list.length){ const li = document.createElement('li'); li.className = 'empty'; li.textContent = EMPTY; li.setAttribute('aria-label', 'Empty'); ul.appendChild(li); return; }
+    list.forEach(i => ul.appendChild(cellEl(i)));
+  }
+
+  function renderPrint(){
+    const list = inbox().slice().sort((x, y) => (x.num || 0) - (y.num || 0));
+    $('#ready-count').textContent = list.length;
+    $('#total-count').textContent = list.length;
+    $('#download').disabled = !list.length;
+    $('#print-day').value = String(settings.printDay ?? 0);
+    const diff = ((settings.printDay ?? 0) - new Date().getDay() + 7) % 7;
+    const dl = $('#days-left'); dl.textContent = diff === 0 ? '(!)' : diff + 'd'; dl.setAttribute('aria-label', diff === 0 ? 'Today' : diff + ' days');
+    const strip = $('#strip'); strip.replaceChildren();
+    if (!list.length){ const e = document.createElement('div'); e.className = 'empty'; e.textContent = EMPTY; strip.appendChild(e); }
+    list.forEach(i => strip.appendChild(slipEl(i)));
+    $('#mark').hidden = !pendingMark;
+    if (typeof renderPrinter === 'function') renderPrinter();
+  }
+  function renderAll(){
+    const inb = inbox(), pr = printed(), n = nextNum();
+    const badge = $('#badge'); badge.textContent = inb.length; badge.dataset.n = String(inb.length);
+    $('#printed-count').textContent = pr.length;
+    fill($('#inbox-list'), inb);
+    fill($('#printed-list'), pr);
+    $('#ed-num').textContent = numLabel(n);
+    $('#ticket').textContent = 'No.' + pad4(n);
+    $('#reg-left').textContent = 'IDEAS ' + pad4(ideas.length);
+    $('#reg-right').textContent = 'PRINTED ' + pad4(pr.length);
+    barcode(ideas.length + 1);
+    renderPrint();
+  }
+  $('#toggle-printed').addEventListener('click', (e) => {
+    const list = $('#printed-list'); list.hidden = !list.hidden;
+    e.currentTarget.setAttribute('aria-expanded', String(!list.hidden));
+  });
+
+  // ---------- data (Supabase) ----------
+  const toIdea = (r) => ({ id: r.id, num: r.num, text: r.text || '', sketch: r.sketch || null, kind: r.kind, todo: !!r.todo, createdAt: r.created_at, printedAt: r.printed_at });
+  function offline(on){ $('#offline').hidden = !on; }
+  async function loadIdeas(){
+    const { data, error } = await sb.from('ideas').select('*').order('created_at', { ascending: false }).limit(1000);
+    if (error){ offline(true); return; }
+    offline(false); ideas = data.map(toIdea); renderAll();
+  }
+  async function loadSettings(){
+    const { data } = await sb.from('settings').select('print_day').maybeSingle();
+    if (data) settings.printDay = data.print_day;
+    renderPrint();
+  }
+  async function addIdea(rec){
+    const { data, error } = await sb.from('ideas').insert({ num: rec.num, text: rec.text, sketch: rec.sketch, kind: rec.kind, todo: rec.todo, created_at: rec.createdAt }).select().single();
+    if (error){ toast(false); offline(true); return false; }
+    offline(false);
+    if (!ideas.some(i => i.id === data.id)) ideas.unshift(toIdea(data));
+    renderAll(); return true;
+  }
+  async function updateIdea(id, patch){
+    const row = {}; if ('printedAt' in patch) row.printed_at = patch.printedAt; if ('todo' in patch) row.todo = patch.todo;
+    const { error } = await sb.from('ideas').update(row).eq('id', id);
+    if (error){ toast(false); return false; }
+    ideas = ideas.map(i => i.id === id ? Object.assign({}, i, patch) : i); renderAll(); return true;
+  }
+  async function deleteIdea(id){
+    const { error } = await sb.from('ideas').delete().eq('id', id);
+    if (error){ toast(false); return; }
+    ideas = ideas.filter(i => i.id !== id); renderAll();
+  }
+
+  // ---------- editor ----------
+  const editor = $('#editor'), cv = $('#ink'), ctx = cv.getContext('2d'), ta = $('#ink-text');
+  let tool = 'text', drawing = false, last = null, hasInk = false, history = [];
+  function setTool(t){
+    tool = t; editor.dataset.tool = t;
+    ['text', 'pen', 'eraser'].forEach(n => $('#t-' + n).setAttribute('aria-pressed', String(n === t)));
+    if (t === 'text') ta.focus({ preventScroll: true }); else ta.blur();
+  }
+  $('#t-text').addEventListener('click', () => setTool('text'));
+  $('#t-pen').addEventListener('click', () => setTool('pen'));
+  $('#t-eraser').addEventListener('click', () => setTool('eraser'));
+  let todoOn = false;
+  function setTodo(on){
+    todoOn = on; editor.classList.toggle('todo', on);
+    const b = $('#t-todo'); b.setAttribute('aria-pressed', String(on)); b.innerHTML = pxSvg(on ? 'boxcheck' : 'box', 2);
+  }
+  setTodo(false);
+  $('#t-todo').addEventListener('click', () => { setTodo(!todoOn); if (tool === 'text') ta.focus({ preventScroll: true }); });
+
+  function inkPresent(){
+    const d = ctx.getImageData(0, 0, cv.width, cv.height).data;
+    for (let k = 3; k < d.length; k += 16) if (d[k] > 0) return true;
+    return false;
+  }
+  function syncButtons(){
+    $('#t-save').disabled = !(ta.value.trim() || hasInk);
+    $('#t-undo').disabled = !history.length;
+  }
+  ta.addEventListener('input', syncButtons);
+  ta.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)){ e.preventDefault(); save(); } });
+
+  function pt(e){ const r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * cv.width / r.width, y: (e.clientY - r.top) * cv.height / r.height }; }
+  // Pixel brush: strokes snap to a 6px grid (128 cells across) so lines step like pixel art
+  const CELL = 6;
+  function dab(x, y){
+    const n = tool === 'eraser' ? 7 : 2, off = Math.floor((n - 1) / 2) * CELL;
+    const gx = Math.floor(x / CELL) * CELL - off, gy = Math.floor(y / CELL) * CELL - off;
+    if (tool === 'eraser') ctx.clearRect(gx, gy, n * CELL, n * CELL);
+    else { ctx.fillStyle = '#1F1E1B'; ctx.fillRect(gx, gy, n * CELL, n * CELL); }
+  }
+  function segment(a, b){
+    const dx = b.x - a.x, dy = b.y - a.y, steps = Math.max(1, Math.ceil(Math.hypot(dx, dy) / (CELL / 2)));
+    for (let i = 1; i <= steps; i++) dab(a.x + dx * i / steps, a.y + dy * i / steps);
+  }
+  function brush(){ ctx.globalCompositeOperation = 'source-over'; }
+  cv.addEventListener('pointerdown', (e) => {
+    if (tool === 'text') return;
+    e.preventDefault();
+    history.push(ctx.getImageData(0, 0, cv.width, cv.height)); if (history.length > 25) history.shift();
+    drawing = true; last = pt(e); try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+    brush(); dab(last.x, last.y);
+  });
+  cv.addEventListener('pointermove', (e) => {
+    if (!drawing) return; brush();
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    (evs.length ? evs : [e]).forEach(ev => { const p = pt(ev); segment(last, p); last = p; });
+  });
+  ['pointerup', 'pointercancel'].forEach(ev => cv.addEventListener(ev, () => {
+    if (!drawing) return; drawing = false; ctx.globalCompositeOperation = 'source-over';
+    hasInk = inkPresent(); syncButtons();
+  }));
+  $('#t-undo').addEventListener('click', () => {
+    const snap = history.pop(); if (!snap) return;
+    ctx.putImageData(snap, 0, 0); hasInk = inkPresent(); syncButtons();
+  });
+  function resetEditor(){ ctx.clearRect(0, 0, cv.width, cv.height); ta.value = ''; hasInk = false; history = []; setTodo(false); syncButtons(); }
+  $('#t-clear').addEventListener('click', () => {
+    if (hasInk || ta.value) history.push(ctx.getImageData(0, 0, cv.width, cv.height));
+    ctx.clearRect(0, 0, cv.width, cv.height); ta.value = ''; hasInk = false; syncButtons();
+  });
+
+  async function save(){
+    const text = ta.value.trim();
+    if (!text && !hasInk) return;
+    $('#t-save').disabled = true;
+    let sketch = null;
+    if (hasInk){
+      sketch = cv.toDataURL('image/png');
+    }
+    const rec = { text: text, sketch: sketch, kind: text && sketch ? 'mixed' : (sketch ? 'sketch' : 'text'), num: nextNum(), createdAt: new Date().toISOString(), printedAt: null, todo: todoOn };
+    const ok = await addIdea(rec);
+    if (ok){ resetEditor(); toast(true, 'Saved'); if (tool === 'text') ta.focus({ preventScroll: true }); } else { syncButtons(); }
+  }
+  $('#t-save').addEventListener('click', save);
+
+  // ---------- print ----------
+  $('#print-day').addEventListener('change', async (e) => {
+    settings.printDay = parseInt(e.target.value, 10); renderPrint();
+    const { error } = await sb.from('settings').upsert({ print_day: settings.printDay }, { onConflict: 'user_id' });
+    if (error) toast(false);
+  });
+  function clean(t){
+    return String(t || '').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, '-').replace(/…/g, '...').replace(/[^\x09\x0A\x0D\x20-\x7E\xA0-\xFF]/g, '');
+  }
+  function fitText(doc, text, w, h){
+    for (let fs = 17; fs >= 8; fs--){
+      doc.setFontSize(fs); const lines = doc.splitTextToSize(text, w), lh = fs * 0.3528 * 1.2;
+      if (lines.length * lh <= h) return { fs, lines };
+    }
+    doc.setFontSize(8); const lh = 8 * 0.3528 * 1.2; let lines = doc.splitTextToSize(text, w); const max = Math.max(1, Math.floor(h / lh));
+    if (lines.length > max){ lines = lines.slice(0, max); lines[max - 1] = lines[max - 1].replace(/\s*\S{0,3}$/, '') + '...'; }
+    return { fs: 8, lines };
+  }
+  function loadImg(src){ return new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; }); }
+  function wrap(g, text, maxW){
+    const out = [];
+    String(text).split('\n').forEach(par => {
+      let line = '';
+      par.split(/\s+/).forEach(w => {
+        const t = line ? line + ' ' + w : w;
+        if (g.measureText(t).width <= maxW){ line = t; return; }
+        if (line) out.push(line);
+        let chunk = '';
+        for (const ch of w){ if (chunk && g.measureText(chunk + ch).width > maxW){ out.push(chunk); chunk = ch; } else chunk += ch; }
+        line = chunk;
+      });
+      out.push(line);
+    });
+    return out;
+  }
+  // Render one slip exactly as it looks on screen (pixel font + drawing) into a PNG for the printer
+  async function slipImage(it){
+    const S = 768, c = document.createElement('canvas'); c.width = S; c.height = S;
+    const g = c.getContext('2d'); g.fillStyle = it.todo ? '#1F1E1B' : '#FFFFFF'; g.fillRect(0, 0, S, S); g.imageSmoothingEnabled = false;
+    if (it.sketch){
+      const im = await loadImg(it.sketch);
+      if (im && it.todo){
+        const t = document.createElement('canvas'); t.width = S; t.height = S; const tg = t.getContext('2d'); tg.imageSmoothingEnabled = false;
+        tg.drawImage(im, 0, 0, S, S); tg.globalCompositeOperation = 'source-in'; tg.fillStyle = '#F5F3EC'; tg.fillRect(0, 0, S, S);
+        g.drawImage(t, 0, 0);
+      } else if (im) g.drawImage(im, 0, 0, S, S);
+    }
+    const pad = S * 0.09; g.textBaseline = 'top';
+    g.font = Math.round(S * 0.04) + 'px "DotGothic16", monospace'; g.fillStyle = it.todo ? '#A9A59B' : '#6E6A62';
+    g.textAlign = 'left'; g.fillText(numLabel(it.num), pad, S * 0.055);
+    g.textAlign = 'right'; g.fillText(shortDate(it.createdAt), S - pad, S * 0.055);
+    if (it.text){
+      g.textAlign = 'left'; g.fillStyle = it.todo ? '#F5F3EC' : '#1F1E1B';
+      const top = S * 0.178, availH = S - top - pad, maxW = S - 2 * pad;
+      let fs = S * 0.082, lines;
+      for (;;){ g.font = '500 ' + fs.toFixed(1) + 'px "Pixelify Sans", monospace'; lines = wrap(g, it.text, maxW); if (lines.length * fs * 1.2 <= availH || fs < S * 0.03) break; fs *= 0.92; }
+      const max = Math.max(1, Math.floor(availH / (fs * 1.2)));
+      if (lines.length > max){ lines = lines.slice(0, max); lines[max - 1] = lines[max - 1].replace(/.{0,3}$/, '...'); }
+      lines.forEach((l, k) => g.fillText(l, pad, top + k * fs * 1.2));
+    }
+    return c.toDataURL('image/png');
+  }
+  async function buildPdf(items){
+    const JsPDF = window.jspdf && window.jspdf.jsPDF; if (!JsPDF) throw new Error('pdf');
+    try { await Promise.all([document.fonts.load('500 40px "Pixelify Sans"'), document.fonts.load('20px "DotGothic16"')]); } catch (_) {}
+    const s = 68, x = 6, gap = 3, head = 4;
+    const h = head + items.length * (s + gap) + 6;
+    const doc = new JsPDF({ unit: 'mm', format: [80, Math.max(h, 81)], orientation: 'portrait' });
+    for (let i = 0; i < items.length; i++){
+      const y = head + i * (s + gap);
+      doc.addImage(await slipImage(items[i]), 'PNG', x, y, s, s);
+      doc.setLineDashPattern([1.2, 1.2], 0); doc.setDrawColor(120); doc.setLineWidth(0.25);
+      doc.line(0, y + s + 1.5, 80, y + s + 1.5); doc.setLineDashPattern([], 0);
+    }
+    return doc;
+  }
+  $('#download').addEventListener('click', async () => {
+    const list = inbox().slice().sort((a, b) => (a.num || 0) - (b.num || 0));
+    if (!list.length) return;
+    let blob; try { blob = (await buildPdf(list)).output('blob'); } catch (_) { toast(false); return; }
+    const d = new Date(), st = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = 'yaoi-' + st + '.pdf'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    pendingMark = list.map(i => i.id); renderPrint();
+  });
+  $('#mark').addEventListener('click', async () => {
+    if (!pendingMark) return;
+    const ids = pendingMark; pendingMark = null; renderPrint();
+    const now = new Date().toISOString();
+    for (const id of ids) await updateIdea(id, { printedAt: now });
+    toast(true, 'Marked as printed');
+  });
+
+
+  // ---------- direct printing: WebUSB + ESC/POS ----------
+  // 80mm printers print 72mm = 576 dots wide at 203 dpi. Each slip is a 576x576 1-bit image, then a paper cut.
+  const DOTS = 576, BAND = 96;
+  const printer = { dev: null, ep: null, iface: null };
+  const hasUSB = typeof navigator !== 'undefined' && 'usb' in navigator;
+
+  async function slipBitmap(it){
+    const im = await loadImg(await slipImage(it));
+    const c = document.createElement('canvas'); c.width = DOTS; c.height = DOTS;
+    const g = c.getContext('2d'); g.fillStyle = '#FFFFFF'; g.fillRect(0, 0, DOTS, DOTS);
+    if (im) g.drawImage(im, 0, 0, DOTS, DOTS);
+    return g.getImageData(0, 0, DOTS, DOTS);
+  }
+  // GS v 0: print raster bit image, sent in bands so small printer buffers never overflow
+  function rasterCommands(img){
+    const wb = img.width / 8, parts = [];
+    for (let y0 = 0; y0 < img.height; y0 += BAND){
+      const rows = Math.min(BAND, img.height - y0);
+      const out = new Uint8Array(8 + wb * rows);
+      out.set([0x1D, 0x76, 0x30, 0x00, wb & 255, wb >> 8, rows & 255, rows >> 8]);
+      let o = 8;
+      for (let y = y0; y < y0 + rows; y++){
+        for (let bx = 0; bx < wb; bx++){
+          let byte = 0;
+          for (let bit = 0; bit < 8; bit++){
+            const p = (y * img.width + bx * 8 + bit) * 4;
+            const lum = 0.299 * img.data[p] + 0.587 * img.data[p + 1] + 0.114 * img.data[p + 2];
+            if (lum < 128) byte |= 0x80 >> bit;
+          }
+          out[o++] = byte;
+        }
+      }
+      parts.push(out);
+    }
+    return parts;
+  }
+  async function buildJob(items){
+    try { await Promise.all([document.fonts.load('500 40px "Pixelify Sans"'), document.fonts.load('20px "DotGothic16"')]); } catch (_) {}
+    const parts = [new Uint8Array([0x1B, 0x40])];                       // ESC @  reset
+    for (const it of items){
+      rasterCommands(await slipBitmap(it)).forEach(p => parts.push(p));
+      parts.push(new Uint8Array([0x1B, 0x64, 0x03]));                  // ESC d 3  feed 3 lines
+      parts.push(new Uint8Array([0x1D, 0x56, 0x42, 0x10]));            // GS V B   feed + partial cut
+    }
+    const total = parts.reduce((n, p) => n + p.length, 0), job = new Uint8Array(total);
+    let o = 0; parts.forEach(p => { job.set(p, o); o += p.length; });
+    return job;
+  }
+  async function openDevice(dev){
+    await dev.open();
+    if (dev.configuration === null) await dev.selectConfiguration(1);
+    let pick = null;
+    for (const itf of dev.configuration.interfaces){
+      for (const alt of itf.alternates){
+        const out = alt.endpoints.find(e => e.direction === 'out' && e.type === 'bulk');
+        if (out && (!pick || alt.interfaceClass === 7)) pick = { itf: itf.interfaceNumber, alt: alt.alternateSetting, ep: out.endpointNumber };
+      }
+    }
+    if (!pick) throw new Error('no printer endpoint');
+    await dev.claimInterface(pick.itf);
+    if (pick.alt) await dev.selectAlternateInterface(pick.itf, pick.alt);
+    printer.dev = dev; printer.ep = pick.ep; printer.iface = pick.itf;
+  }
+  async function send(bytes){
+    const CH = 8192;
+    for (let o = 0; o < bytes.length; o += CH){
+      const r = await printer.dev.transferOut(printer.ep, bytes.subarray(o, o + CH));
+      if (r.status !== 'ok') throw new Error('transfer ' + r.status);
+    }
+  }
+  function renderPrinter(){
+    const on = !!printer.dev;
+    $('#usb').hidden = !hasUSB;
+    $('#usb').setAttribute('aria-pressed', String(on));
+    $('#usb').setAttribute('aria-label', on ? 'Printer connected: tap for a test print' : 'Connect printer');
+    $('#usb').title = on ? 'Test print' : 'Connect printer';
+    $('#print-now').hidden = !on;
+    $('#print-now').disabled = !inbox().length;
+  }
+  async function reconnect(){
+    if (!hasUSB) return;
+    try { const devs = await navigator.usb.getDevices(); if (devs.length && !printer.dev) await openDevice(devs[0]); } catch (_) { printer.dev = null; }
+    renderPrinter();
+  }
+  if (hasUSB){
+    navigator.usb.addEventListener('disconnect', (e) => { if (e.device === printer.dev){ printer.dev = null; renderPrinter(); } });
+    navigator.usb.addEventListener('connect', reconnect);
+  }
+  let busy = false;
+  $('#usb').addEventListener('click', async () => {
+    if (busy) return;
+    if (!printer.dev){
+      try { const dev = await navigator.usb.requestDevice({ filters: [] }); await openDevice(dev); toast(true, 'Printer connected'); }
+      catch (e){ if (e && e.name !== 'NotFoundError'){ console.error(e); toast(false, 'Could not connect: ' + (e.message || e.name)); } }
+      renderPrinter(); return;
+    }
+    busy = true;
+    try { await send(await buildJob([{ num: 0, text: '( ^ w ^ )\ny.aoi test', createdAt: new Date().toISOString() }])); toast(true, 'Test printed'); }
+    catch (e){ console.error(e); toast(false, 'Print failed'); }
+    busy = false;
+  });
+  $('#print-now').addEventListener('click', async () => {
+    const list = inbox().slice().sort((a, b) => (a.num || 0) - (b.num || 0));
+    if (!list.length || !printer.dev || busy) return;
+    busy = true; $('#print-now').disabled = true;
+    try {
+      await send(await buildJob(list));
+      const now = new Date().toISOString();
+      for (const it of list) await updateIdea(it.id, { printedAt: now });
+      toast(true, list.length + ' printed');
+    } catch (e){ console.error(e); toast(false, 'Print failed'); }
+    busy = false; renderPrinter();
+  });
+  window.yaoiPrinter = { buildJob };
+
+  // ---------- logo: draw the ASCII art on a fixed character grid ----------
+  function drawMark(){
+    const src = $('#mark-src'), c = $('#logo-art'); if (!src || !c) return;
+    const rows = src.textContent.replace(/^\n+|\n+$/g, '').split('\n');
+    const cols = Math.max.apply(null, rows.map(r => r.length));
+    const cw = 6, chh = 11, k = 3;
+    c.width = cols * cw * k; c.height = rows.length * chh * k;
+    const g = c.getContext('2d'); g.setTransform(k, 0, 0, k, 0, 0);
+    g.clearRect(0, 0, cols * cw, rows.length * chh);
+    g.fillStyle = '#1F1E1B'; g.strokeStyle = '#1F1E1B'; g.lineWidth = 1.1; g.lineJoin = 'round'; g.font = '700 11.5px "Courier Prime","Courier New",Courier,monospace';
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    rows.forEach((r, y) => { for (let i = 0; i < r.length; i++) if (r[i] === '#' || r[i] === '█') g.fillRect(i * cw, y * chh, cw + 0.05, chh + 0.05); else if (r[i] !== ' ') g.fillText(r[i], i * cw + cw / 2, y * chh + chh / 2); });
+  }
+  drawMark();
+  if (document.fonts && document.fonts.load) document.fonts.load('700 10px "Courier Prime"').then(drawMark, () => {});
+
+  // ---------- boot ----------
+  stamp(); setInterval(stamp, 30000);
+  syncButtons();
+  function show(view){
+    $('#view-setup').hidden = view !== 'setup';
+    $('#view-login').hidden = view !== 'login';
+    $('#app').hidden = view !== 'app';
+    $('#logout').hidden = view !== 'app';
+  }
+  let channel = null;
+  async function enter(){
+    show('app'); route();
+    await Promise.all([loadIdeas(), loadSettings()]);
+    if (!channel){
+      channel = sb.channel('ideas-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'ideas' }, () => loadIdeas())
+        .subscribe();
+    }
+    reconnect();
+  }
+  function leave(){
+    if (channel){ sb.removeChannel(channel); channel = null; }
+    ideas = []; renderAll(); show('login');
+  }
+  const cfg = window.YAOI_CONFIG || {};
+  if (!cfg.supabaseUrl || !cfg.supabaseKey || /YOUR/.test(cfg.supabaseUrl + cfg.supabaseKey) || !window.supabase){
+    show('setup');
+  } else {
+    sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseKey, { auth: { persistSession: true, autoRefreshToken: true } });
+    $('#login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      $('#login-go').disabled = true;
+      const { error } = await sb.auth.signInWithPassword({ email: $('#login-email').value.trim(), password: $('#login-pass').value });
+      $('#login-go').disabled = false;
+      if (error) toast(false, 'Sign-in failed');
+    });
+    $('#logout').addEventListener('click', () => sb.auth.signOut());
+    let inApp = false;
+    sb.auth.onAuthStateChange((_event, session) => {
+      if (session && !inApp){ inApp = true; enter(); }
+      else if (!session && inApp){ inApp = false; leave(); }
+    });
+    sb.auth.getSession().then(({ data }) => { if (!data.session) show('login'); });
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && inApp) loadIdeas(); });
+  }
+})();
+</script>
+</body>
+</html>
